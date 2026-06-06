@@ -38,7 +38,8 @@ A smart passenger rerouting system that helps travellers find alternative transp
 ```bash
 cd rerouting
 pip install -r requirements.txt
-uvicorn api:app --reload --port 8000
+# Make sure your virtual environment is active (e.g. source ../venv/bin/activate)
+python3 -m uvicorn api:app --reload --port 8000
 ```
 
 The API will be available at `http://localhost:8000`. Try `GET /health` to verify.
