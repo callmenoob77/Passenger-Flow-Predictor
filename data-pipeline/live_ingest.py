@@ -1,7 +1,7 @@
 """
-Live ingest METAR LRIA: ultimele 3 ore -> Supabase (metar_raw).
-Ruleaza pe GitHub Actions la 15 min. Connection string vine din env (GitHub Secret),
-NU din cod -> parola nu ajunge niciodata in repo.
+Live ingest METAR LRIA: last 3 hours -> Supabase (metar_raw).
+Runs on GitHub Actions every 15 min. Connection string comes from env (GitHub Secret),
+NOT from code -> password never ends up in the repo.
 """
 
 import io
@@ -11,7 +11,7 @@ import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
 
-CONN = "postgresql://postgres.tuqhlwpmhkirtvgihdxs:AdiDamianGebz@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"  # din Supabase Settings -> Database# setat ca GitHub Secret
+CONN = "postgresql://postgres.tuqhlwpmhkirtvgihdxs:AdiDamianGebz@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"  # from Supabase Settings -> Database  # set as GitHub Secret
 STATION = "LRIA"
 
 url = (
@@ -25,10 +25,10 @@ r.raise_for_status()
 
 df = pd.read_csv(io.StringIO(r.text), na_values=["M", "T"])
 if df.empty:
-    print("Niciun rand de la IEM, ies fara eroare.")
+    print("No rows from IEM, exiting without error.")
     raise SystemExit(0)
 
-# IEM -> nume descriptive
+# IEM -> descriptive names
 df["airport_icao"]           = df["station"]
 df["observed_at"]            = pd.to_datetime(df["valid"]).dt.tz_localize("UTC")
 df["temp_c"]                 = (df["tmpf"] - 32) * 5 / 9
@@ -62,6 +62,6 @@ execute_values(
 )
 conn.commit()
 cur.execute("SELECT count(*), max(observed_at) FROM metar_raw WHERE airport_icao = %s", (STATION,))
-print(f"Procesate {len(rows)} obs. In DB acum:", cur.fetchone())
+print(f"Processed {len(rows)} observations. In DB now:", cur.fetchone())
 cur.close()
 conn.close()
