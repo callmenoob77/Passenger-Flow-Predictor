@@ -1,19 +1,37 @@
-// Screen3.jsx — Alternatives Screen
-// Displayed after pressing "Check Alternatives" on Screen2.
-//
-// Props:
-//   flightNumber — string, e.g.: "LH6769"
-//   data         — response from backend (POST /reroute). Shape:
-//                  { cancelled_flight: {origin, dest, scheduled_departure},
-//                    options: [{ mode, provider, depart, arrive, duration_h,
-//                                price_eur, transfers, deep_link, score }] }
-//   onBack       — callback for the back button (optional)
-
+// screen4.tsx — Alternatives Screen
 import React from "react";
-import logo from "./assets/Logo.png";
+import logo from "../assets/Logo.png";
 
-// ---- example data: EXACT shape returned by /reroute (Iasi -> Milano) ----
-const EXAMPLE_DATA = {
+interface Option {
+  mode: "flight" | "bus" | "train" | "carpool";
+  provider: string;
+  depart?: string;
+  arrive?: string;
+  duration_h?: number;
+  price_eur?: number;
+  transfers: number;
+  deep_link?: string;
+  score: number;
+}
+
+interface CancelledFlight {
+  origin?: string;
+  dest?: string;
+  scheduled_departure?: string;
+}
+
+interface RerouteData {
+  cancelled_flight: CancelledFlight;
+  options: Option[];
+}
+
+interface Screen4Props {
+  flightNumber?: string;
+  data?: RerouteData;
+  onBack?: () => void;
+}
+
+const EXAMPLE_DATA: RerouteData = {
   cancelled_flight: {
     origin: "Iasi",
     dest: "Milan",
@@ -28,29 +46,31 @@ const EXAMPLE_DATA = {
   ],
 };
 
-// ---- display helpers ----
-const fmtTime = (iso) =>
+const fmtTime = (iso?: string) =>
   iso ? new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "—";
 
-const fmtDur = (h) => {
+const fmtDur = (h?: number) => {
   if (h == null) return "";
   const hh = Math.floor(h);
   const mm = Math.round((h - hh) * 60);
   return mm ? `${hh}h ${mm}m` : `${hh}h`;
 };
 
-// Prices from cache are in USD (from Google). Approximate conversion to EUR for display.
-const fmtPrice = (usd) => (usd == null ? "—" : `~€${Math.round(usd * 0.92)}`);
+const fmtPrice = (usd?: number) => (usd == null ? "—" : `~€${Math.round(usd * 0.92)}`);
 
-const MODE = {
+interface ModeConfig {
+  label: string;
+  accent: string;
+}
+
+const MODE: Record<string, ModeConfig> = {
   flight: { label: "FLIGHT",  accent: "#174A5D" },
   bus:    { label: "BUS",     accent: "#F5A623" },
   train:  { label: "TRAIN",   accent: "#6DD400" },
   carpool:{ label: "CARPOOL", accent: "#174A5D" },
 };
 
-// ---- styles matching the rest of the app ----
-const styles = {
+const styles: Record<string, React.CSSProperties> = {
   page: {
     width: "390px",
     minHeight: "844px",
@@ -148,7 +168,7 @@ const styles = {
   empty: { fontSize: "15px", color: "#5A6472", textAlign: "center", marginTop: "40px" },
 };
 
-function OptionCard({ opt }) {
+function OptionCard({ opt }: { opt: Option }) {
   const m = MODE[opt.mode] || MODE.flight;
   const transferLabel =
     opt.transfers === 0
@@ -179,11 +199,11 @@ function OptionCard({ opt }) {
   );
 }
 
-export default function Screen3({
+export default function Screen4({
   flightNumber = "LH6769",
   data = EXAMPLE_DATA,
   onBack,
-}) {
+}: Screen4Props) {
   const cf = data?.cancelled_flight || {};
   const options = data?.options || [];
 

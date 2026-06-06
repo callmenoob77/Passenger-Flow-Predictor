@@ -10,16 +10,18 @@ def main():
     conn = psycopg2.connect(CONN)
     cur = conn.cursor()
     
-    print("Creating passenger_notifications table...")
+    print("Creating refund_requests table...")
     sql = """
-    CREATE TABLE IF NOT EXISTS passenger_notifications (
+    CREATE TABLE IF NOT EXISTS refund_requests (
         id SERIAL PRIMARY KEY,
-        email TEXT NOT NULL,
         flight_number TEXT NOT NULL,
-        subscribed_at TIMESTAMPTZ DEFAULT NOW(),
-        notified BOOLEAN DEFAULT FALSE,
-        notified_at TIMESTAMPTZ NULL,
-        CONSTRAINT unique_email_flight UNIQUE (email, flight_number)
+        full_name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        pnr TEXT NOT NULL,
+        refund_type TEXT NOT NULL,
+        notes TEXT NULL,
+        submitted_at TIMESTAMPTZ DEFAULT NOW()
     );
     """
     cur.execute(sql)
@@ -30,11 +32,11 @@ def main():
         SELECT EXISTS (
             SELECT FROM information_schema.tables 
             WHERE table_schema = 'public' 
-            AND table_name = 'passenger_notifications'
+            AND table_name = 'refund_requests'
         );
     """)
     exists = cur.fetchone()[0]
-    print(f"Table passenger_notifications exists: {exists}")
+    print(f"Table refund_requests exists: {exists}")
     
     cur.close()
     conn.close()

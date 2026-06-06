@@ -2,7 +2,8 @@ import { useState } from "react";
 import Home from "./screens/home";
 import Screen2 from "./screens/screen2";
 import CancelledScreen from "./screens/screen3";
-import AlternativesScreen from "./Screen3";
+import AlternativesScreen from "./screens/screen4";
+import RefundScreen from "./screens/screen5";
 
 function App() {
   const [screen, setScreen] = useState(1);
@@ -106,7 +107,7 @@ function App() {
       {screen === 3 && flightData && (
         <CancelledScreen
           flightNumber={flightData.flightNumber}
-          onRefund={() => alert("Refund flow — coming soon")}
+          onRefund={() => setScreen(5)}
           onRerouting={() => fetchAlternatives(flightData)}
         />
       )}
@@ -116,6 +117,15 @@ function App() {
           flightNumber={flightData?.flightNumber}
           data={rerouteData}
           onBack={() => setScreen(3)}
+        />
+      )}
+
+      {screen === 5 && flightData && (
+        <RefundScreen
+          flightNumber={flightData.flightNumber}
+          email={flightData.email}
+          onBack={() => setScreen(3)}
+          onHome={() => setScreen(1)}
         />
       )}
     </>

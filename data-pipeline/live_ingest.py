@@ -4,14 +4,18 @@ Runs on GitHub Actions every 15 min. Connection string comes from env (GitHub Se
 NOT from code -> password never ends up in the repo.
 """
 
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+
 import io
 import os
 import requests
 import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
+from config import CONN
 
-CONN = "postgresql://postgres.tuqhlwpmhkirtvgihdxs:AdiDamianGebz@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"  # from Supabase Settings -> Database  # set as GitHub Secret
 STATION = "LRIA"
 
 url = (

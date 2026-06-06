@@ -1,11 +1,15 @@
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+
 import io
 import requests
 import pandas as pd
 import psycopg2
 from psycopg2.extras import execute_values
+from config import CONN
 
 # ---- CONFIG ----
-CONN = "postgresql://postgres.tuqhlwpmhkirtvgihdxs:AdiDamianGebz@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"  # from Supabase Settings -> Database
 STATION = "LRIA"
 YEAR1, MONTH1, DAY1 = 2023, 6, 1      # start: 3 years back
 YEAR2, MONTH2, DAY2 = 2026, 6, 7      # end: today
