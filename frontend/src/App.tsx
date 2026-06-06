@@ -98,7 +98,7 @@ function App() {
           destCity={flightData.dest_city}
           destIcao={flightData.dest_icao}
           scheduledDeparture={flightData.scheduled_departure}
-          status="FOG_RISK"
+          status={flightData.status || "ON_TIME"}
           onActivate={() => console.log("Alerts activated")}
           onAlternatives={() => setScreen(3)}
         />

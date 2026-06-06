@@ -20,7 +20,11 @@ const styles: { [key: string]: React.CSSProperties } = {
   header: {
     width: "100%",
     background: "#174A5D",
-    padding: "0px",
+    padding: "20px 20px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    boxSizing: "border-box",
   },
   content: {
     flex: 1,
@@ -256,7 +260,21 @@ export default function Screen5({
       <div style={styles.page}>
         <div style={styles.header}>
           <img src={logo} alt="Logo" style={{ width: "100px", height: "auto" }} />
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            style={{ cursor: "pointer", opacity: 0.8, transition: "opacity 0.2s" }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.8")}
+          >
+            <rect x="3" y="5" width="18" height="2" rx="1" fill="#EDF2F4" />
+            <rect x="3" y="11" width="18" height="2" rx="1" fill="#EDF2F4" />
+            <rect x="3" y="17" width="18" height="2" rx="1" fill="#EDF2F4" />
+          </svg>
         </div>
+
         <div style={styles.content}>
           <div style={styles.successCard}>
             <div style={styles.successBadge}>
@@ -285,7 +303,21 @@ export default function Screen5({
       {/* Header */}
       <div style={styles.header}>
         <img src={logo} alt="Logo" style={{ width: "100px", height: "auto" }} />
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          style={{ cursor: "pointer", opacity: 0.8, transition: "opacity 0.2s" }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.8")}
+        >
+          <rect x="3" y="5" width="18" height="2" rx="1" fill="#EDF2F4" />
+          <rect x="3" y="11" width="18" height="2" rx="1" fill="#EDF2F4" />
+          <rect x="3" y="17" width="18" height="2" rx="1" fill="#EDF2F4" />
+        </svg>
       </div>
+
 
       {/* Content */}
       <div style={styles.content}>

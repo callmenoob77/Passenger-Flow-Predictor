@@ -3258,5 +3258,95 @@
    "stops": 1,
    "ground_h": 3.0
   }
+ ],
+ "dublin|DUB": [
+  {
+   "provider": "Ryanair",
+   "from_city": "Iasi",
+   "from_iata": "IAS",
+   "date": "2026-06-10",
+   "dep_str": "11:20 AM on Wed, Jun 10",
+   "arr_str": "1:15 PM on Wed, Jun 10",
+   "duration": "3 hr 55 min",
+   "price_usd": "$145",
+   "stops": 0,
+   "ground_h": 0.0
+  },
+  {
+   "provider": "Wizz Air (from Suceava)",
+   "from_city": "Suceava",
+   "from_iata": "SCV",
+   "date": "2026-06-10",
+   "dep_str": "3:40 PM on Wed, Jun 10",
+   "arr_str": "5:35 PM on Wed, Jun 10",
+   "duration": "3 hr 55 min",
+   "price_usd": "$189",
+   "stops": 0,
+   "ground_h": 1.5
+  },
+  {
+   "provider": "Ryanair (from Cluj-Napoca)",
+   "from_city": "Cluj-Napoca",
+   "from_iata": "CLJ",
+   "date": "2026-06-10",
+   "dep_str": "8:30 PM on Wed, Jun 10",
+   "arr_str": "10:15 PM on Wed, Jun 10",
+   "duration": "3 hr 45 min",
+   "price_usd": "$95",
+   "stops": 0,
+   "ground_h": 4.5
+  }
+ ],
+ "londra|LTN": [
+  {
+   "provider": "Wizz Air",
+   "from_city": "Iasi",
+   "from_iata": "IAS",
+   "date": "2026-06-10",
+   "dep_str": "6:15 AM on Wed, Jun 10",
+   "arr_str": "7:45 AM on Wed, Jun 10",
+   "duration": "3 hr 30 min",
+   "price_usd": "$120",
+   "stops": 0,
+   "ground_h": 0.0
+  },
+  {
+   "provider": "Ryanair (from Suceava)",
+   "from_city": "Suceava",
+   "from_iata": "SCV",
+   "date": "2026-06-10",
+   "dep_str": "10:45 AM on Wed, Jun 10",
+   "arr_str": "12:15 PM on Wed, Jun 10",
+   "duration": "3 hr 30 min",
+   "price_usd": "$85",
+   "stops": 0,
+   "ground_h": 1.5
+  }
+ ],
+ "vienna|VIE": [
+  {
+   "provider": "Austrian Airlines",
+   "from_city": "Iasi",
+   "from_iata": "IAS",
+   "date": "2026-06-10",
+   "dep_str": "2:10 PM on Wed, Jun 10",
+   "arr_str": "3:15 PM on Wed, Jun 10",
+   "duration": "2 hr 05 min",
+   "price_usd": "$210",
+   "stops": 0,
+   "ground_h": 0.0
+  },
+  {
+   "provider": "Wizz Air (from Suceava)",
+   "from_city": "Suceava",
+   "from_iata": "SCV",
+   "date": "2026-06-10",
+   "dep_str": "6:30 PM on Wed, Jun 10",
+   "arr_str": "7:35 PM on Wed, Jun 10",
+   "duration": "2 hr 05 min",
+   "price_usd": "$115",
+   "stops": 0,
+   "ground_h": 1.5
+  }
  ]
 }

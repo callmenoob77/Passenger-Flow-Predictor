@@ -16,11 +16,15 @@ flexDirection: "column",
 fontFamily: "'Outfit', sans-serif",
 margin: "0 auto",
 },
-header: {
-width: "100%",
-background: "#174A5D",
-padding: "0px 0px 0px",
-},
+  header: {
+    width: "100%",
+    background: "#174A5D",
+    padding: "20px 20px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    boxSizing: "border-box",
+  },
 content: {
 flex: 1,
 padding: "40px 24px 32px",
@@ -103,14 +107,14 @@ const handleSend = () => {
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  // 2 letters + space + 1 to 4 digits
-  const flightRegex = /^[A-Z]{2}\s\d{1,4}$/;
+  // 2-character carrier code (e.g., RO, W6, FR) + space + 1 to 4 digits
+  const flightRegex = /^[A-Z][A-Z0-9]\s\d{1,4}$/;
 
   let hasError = false;
 
   if (!flightRegex.test(flightNumber.trim().toUpperCase())) {
     setFlightError(
-      "Flight number must be in format LL X to LL XXXX (e.g. RO 1, RO 1234)"
+      "Flight number must be in format XX 1234 (e.g. RO 6769, W6 3703)"
     );
     hasError = true;
   }
@@ -139,11 +143,23 @@ const handleSend = () => {
 
 return (
 <div style={styles.page}>
-{/* Header with logo */}
 <div style={styles.header}>
-<img src={logo} alt="Logo" style={{ width: "100px", height: "auto" }} />
-
+  <img src={logo} alt="Logo" style={{ width: "100px", height: "auto" }} />
+  <svg
+    width="32"
+    height="32"
+    viewBox="0 0 24 24"
+    fill="none"
+    style={{ cursor: "pointer", opacity: 0.8, transition: "opacity 0.2s" }}
+    onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+    onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.8")}
+  >
+    <rect x="3" y="5" width="18" height="2" rx="1" fill="#EDF2F4" />
+    <rect x="3" y="11" width="18" height="2" rx="1" fill="#EDF2F4" />
+    <rect x="3" y="17" width="18" height="2" rx="1" fill="#EDF2F4" />
+  </svg>
 </div>
+
 
 {/* Content */}
 <div style={styles.content}>
