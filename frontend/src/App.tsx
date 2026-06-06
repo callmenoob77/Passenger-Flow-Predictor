@@ -40,6 +40,29 @@ function App() {
             setLoading(true);
             try {
               const code = data.flightNumber.trim().toUpperCase().replace(/\s+/, "-");
+              
+              // 1. Register passenger notification subscription
+              const subRes = await fetch("/api/subscribe", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  email: data.email,
+                  flight_number: data.flightNumber,
+                }),
+              });
+              if (!subRes.ok) {
+                const errText = await subRes.text();
+                let errMsg = "Failed to register notifications.";
+                try {
+                  const errJson = JSON.parse(errText);
+                  errMsg = errJson.detail || errMsg;
+                } catch {
+                  errMsg = errText || errMsg;
+                }
+                throw new Error(errMsg);
+              }
+
+              // 2. Fetch flight status
               const res = await fetch(`/api/flight/${encodeURIComponent(code)}`);
               if (!res.ok) throw new Error("Flight not found in the demo database.");
               const route = await res.json();

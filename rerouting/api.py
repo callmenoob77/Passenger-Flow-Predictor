@@ -4,6 +4,7 @@ Run: uvicorn api:app --reload --port 8000
 """
 
 from datetime import datetime, timedelta
+import psycopg2
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -24,6 +25,8 @@ FLIGHT_DB = {
     "FR 4321": {"origin_city": "Iasi", "origin_icao": "LRIA", "dest_city": "Londra", "dest_icao": "LTN"},
 }
 
+CONN = "postgresql://postgres.tuqhlwpmhkirtvgihdxs:AdiDamianGebz@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"
+
 app = FastAPI(title="Fog Copilot - Rerouting")
 
 app.add_middleware(
@@ -40,6 +43,11 @@ class FlightIn(BaseModel):
     dest_city: str
     dest_icao: str = ""
     scheduled_departure: datetime
+
+
+class SubscribeIn(BaseModel):
+    email: str
+    flight_number: str
 
 
 def _opt_to_dict(o, f):
@@ -83,3 +91,37 @@ def reroute(body: FlightIn, top_n: int = 5):
 @app.get("/health")
 def health():
     return {"ok": True}
+
+
+@app.post("/subscribe")
+def subscribe(body: SubscribeIn):
+    # Validate flight number exists in database
+    key = body.flight_number.upper().replace("-", " ").strip()
+    if key not in FLIGHT_DB:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Flight not found in demo database. Try: RO 6769, W6 2345, FR 4321"
+        )
+
+    # Insert subscription to database
+    try:
+        conn = psycopg2.connect(CONN)
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO passenger_notifications (email, flight_number)
+            VALUES (%s, %s)
+            ON CONFLICT (email, flight_number) DO NOTHING
+            """,
+            (body.email.strip().lower(), key)
+        )
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error: {str(e)}"
+        )
+
+    return {"ok": True, "message": f"Successfully subscribed {body.email} to flight {key}"}

@@ -6,4 +6,3 @@ __pycache__/
 node_modules/
 frontend/dist/
 .DS_Store
-rerouting/gflights_cache.json
