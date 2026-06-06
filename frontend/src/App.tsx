@@ -92,6 +92,11 @@ function App() {
       {screen === 2 && flightData && (
         <Screen2
           flightNumber={flightData.flightNumber}
+          originCity={flightData.origin_city}
+          originIcao={flightData.origin_icao}
+          destCity={flightData.dest_city}
+          destIcao={flightData.dest_icao}
+          scheduledDeparture={flightData.scheduled_departure}
           status="FOG_RISK"
           onActivate={() => console.log("Alerts activated")}
           onAlternatives={() => setScreen(3)}
