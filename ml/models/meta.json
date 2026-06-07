@@ -1,0 +1,21 @@
+{
+  "horizon": "2h",
+  "threshold_early_warning": 0.01,
+  "threshold_full_risk": 0.08,
+  "fog_threshold_m": 1000,
+  "n_estimators": 200,
+  "n_train": 43021,
+  "n_cal": 14340,
+  "n_test": 14341,
+  "fog_rate_train": 0.02266335045675368,
+  "fog_rate_test": 0.030123422355484274,
+  "test_recall_full_risk": 0.9305555555555556,
+  "test_precision_full_risk": 0.33668341708542715,
+  "test_f1_full_risk": 0.4944649446494465,
+  "test_recall_early_warning": 0.9884259259259259,
+  "test_precision_early_warning": 0.14538644875723528,
+  "test_brier": 0.012853006674493917,
+  "mean_ci_width": 0.016955556547931565,
+  "feature_count": 30,
+  "trained_at": "2026-06-07T08:24:22.143388+00:00"
+}
