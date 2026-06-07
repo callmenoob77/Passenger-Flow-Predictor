@@ -16,4 +16,4 @@ jobs:
       - run: pip install requests pandas psycopg2-binary python-dotenv
       - run: python data-pipeline/live_ingest.py
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SUPABASE_CONN_STRING: ${{ secrets.SUPABASE_CONN_STRING }}
