@@ -1,0 +1,49 @@
+name: Train & Save Fog Model
+
+on:
+  workflow_dispatch:        # rulare manuala (buton in GitHub Actions)
+  schedule:
+    - cron: "0 3 * * 1"   # automat in fiecare luni la 03:00 UTC
+
+jobs:
+  train:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ml
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[serve]"
+
+      - name: Train model
+        run: python train.py
+
+      - name: Commit model artifacts
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -f ml/models/
+          git diff --cached --quiet || git commit -m "chore: retrain fog model [skip ci]"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifacts (backup)
+        uses: actions/upload-artifact@v4
+        with:
+          name: fog-model-${{ github.run_number }}
+          path: |
+            ml/models/ensemble.pkl
+            ml/models/calibrator.pkl
+            ml/models/calibrator_lo.pkl
+            ml/models/calibrator_hi.pkl
+            ml/models/meta.json
+            ml/models/feature_cols.json
+          retention-days: 30

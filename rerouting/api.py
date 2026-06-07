@@ -4,6 +4,8 @@ Run: uvicorn api:app --reload --port 8000
 """
 
 from datetime import datetime, timedelta
+import os
+import requests as _requests
 import psycopg2
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -79,7 +81,56 @@ def flight_lookup(flight_number: str):
             detail=f"Flight not found in database. Try: RO 6769, OS 704, FR 3113"
         )
     tomorrow = (datetime.now() + timedelta(days=1)).replace(hour=8, minute=0, second=0, microsecond=0)
-    return {**route, "flightNumber": key, "scheduled_departure": tomorrow.isoformat()}
+
+    # Try live ML prediction; fall back to hardcoded status if ML API not running
+    status = route.get("status", "ON_TIME")
+    ml_url = os.environ.get("ML_API_URL", "http://localhost:8001")
+    try:
+        metar = _fetch_current_metar_lria()
+        if metar:
+            ml_res = _requests.post(
+                f"{ml_url}/predict_fog",
+                json={**metar, "flight_code": key},
+                timeout=3,
+            )
+            if ml_res.status_code == 200:
+                alert = ml_res.json().get("alert", "silent")
+                status = "FOG_RISK" if alert in ("full_risk", "early_warning") else "ON_TIME"
+    except Exception:
+        pass  # ML API not running — use FLIGHT_DB status
+
+    return {**route, "flightNumber": key, "scheduled_departure": tomorrow.isoformat(), "status": status}
+
+
+def _fetch_current_metar_lria() -> dict | None:
+    """Fetch latest METAR for LRIA from NOAA and return feature dict for ML API."""
+    try:
+        r = _requests.get(
+            "https://aviationweather.gov/api/data/metar",
+            params={"ids": "LRIA", "format": "json", "hours": 1},
+            timeout=5,
+        )
+        r.raise_for_status()
+        data = r.json()
+        if not data:
+            return None
+        obs = data[0]
+        vis_mi = obs.get("visib")
+        temp   = obs.get("temp")
+        dewp   = obs.get("dewp")
+        wspd   = obs.get("wspd")
+        wdir   = obs.get("wdir")
+        if any(v is None for v in [vis_mi, temp, dewp, wspd, wdir]):
+            return None
+        return {
+            "visibility_m":   float(vis_mi) * 1609.344,
+            "temperature_c":  float(temp),
+            "dewpoint_c":     float(dewp),
+            "wind_speed_mps": float(wspd) * 0.514444,
+            "wind_dir_deg":   int(wdir),
+        }
+    except Exception:
+        return None
 
 
 @app.post("/reroute")
