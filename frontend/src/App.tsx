@@ -5,6 +5,12 @@ import CancelledScreen from "./screens/screen3";
 import AlternativesScreen from "./screens/screen4";
 import RefundScreen from "./screens/screen5";
 
+// In dev: empty string → Vite proxy rewrites /api/* to backend.
+// In prod: set VITE_API_BASE=https://your-backend.onrender.com (no trailing slash).
+const API_BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
+const api = (path: string) =>
+  API_BASE ? `${API_BASE}${path}` : `/api${path}`;
+
 function App() {
   const [screen, setScreen] = useState(1);
   const [flightData, setFlightData] = useState<any>(null);
@@ -16,7 +22,7 @@ function App() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/reroute", {
+      const res = await fetch(api("/reroute"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(flight),
@@ -43,7 +49,7 @@ function App() {
               const code = data.flightNumber.trim().toUpperCase().replace(/\s+/, "-");
               
               // 1. Register passenger notification subscription
-              const subRes = await fetch("/api/subscribe", {
+              const subRes = await fetch(api("/subscribe"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -64,7 +70,7 @@ function App() {
               }
 
               // 2. Fetch flight status
-              const res = await fetch(`/api/flight/${encodeURIComponent(code)}`);
+              const res = await fetch(api(`/flight/${encodeURIComponent(code)}`));
               if (!res.ok) throw new Error("Flight not found in the demo database.");
               const route = await res.json();
               setFlightData({ ...data, ...route });

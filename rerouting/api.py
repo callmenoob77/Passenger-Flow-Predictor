@@ -6,7 +6,11 @@ Run: uvicorn api:app --reload --port 8000
 from datetime import datetime, timedelta
 import os
 import requests as _requests
-import psycopg2
+try:
+    import psycopg2
+    _HAS_PSYCOPG2 = True
+except ImportError:
+    _HAS_PSYCOPG2 = False
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -27,9 +31,15 @@ from flights_db import FLIGHT_DB, _find_flight
 
 app = FastAPI(title="Fog Copilot - Rerouting")
 
+_allowed_origins = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173",
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=_allowed_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -162,26 +172,23 @@ def subscribe(body: SubscribeIn):
             detail=f"Flight not found in database. Try: RO 6769, OS 704, FR 3113"
         )
 
-    # Insert subscription to database
-    try:
-        conn = psycopg2.connect(CONN)
-        cur = conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO passenger_notifications (email, flight_number)
-            VALUES (%s, %s)
-            ON CONFLICT (email, flight_number) DO NOTHING
-            """,
-            (body.email.strip().lower(), key)
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Database error: {str(e)}"
-        )
+    if CONN and _HAS_PSYCOPG2:
+        try:
+            conn = psycopg2.connect(CONN)
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO passenger_notifications (email, flight_number)
+                VALUES (%s, %s)
+                ON CONFLICT (email, flight_number) DO NOTHING
+                """,
+                (body.email.strip().lower(), key)
+            )
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
     return {"ok": True, "message": f"Successfully subscribed {body.email} to flight {key}"}
 
@@ -204,32 +211,30 @@ def claim_refund(body: RefundIn):
             detail=f"Flight not found in database. Try: RO 6769, OS 704, FR 3113"
         )
 
-    try:
-        conn = psycopg2.connect(CONN)
-        cur = conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO refund_requests (flight_number, full_name, email, phone, pnr, refund_type, notes)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """,
-            (
-                key,
-                body.full_name.strip(),
-                body.email.strip().lower(),
-                body.phone.strip(),
-                pnr,
-                body.refund_type.strip(),
-                body.notes.strip() if body.notes else None
+    if CONN and _HAS_PSYCOPG2:
+        try:
+            conn = psycopg2.connect(CONN)
+            cur = conn.cursor()
+            cur.execute(
+                """
+                INSERT INTO refund_requests (flight_number, full_name, email, phone, pnr, refund_type, notes)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    key,
+                    body.full_name.strip(),
+                    body.email.strip().lower(),
+                    body.phone.strip(),
+                    pnr,
+                    body.refund_type.strip(),
+                    body.notes.strip() if body.notes else None
+                )
             )
-        )
-        conn.commit()
-        cur.close()
-        conn.close()
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Database error: {str(e)}"
-        )
+            conn.commit()
+            cur.close()
+            conn.close()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
     return {"ok": True, "message": f"Refund request successfully submitted for {body.full_name} under PNR {pnr}"}
 

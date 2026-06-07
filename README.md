@@ -1,125 +1,170 @@
-# ✈️ Hecatron — Fog Copilot
+# Hecatron — Fog Copilot
 
-A passenger rerouting system that helps travelers find alternative transport when flights are cancelled due to fog at Iasi Airport (LRIA).
+A passenger rerouting system that helps travelers find alternative transport when flights are cancelled due to fog at Iași Airport (LRIA).
 
-> **How it works:** The system checks your flight status. If your flight is at risk of fog or cancelled, it maps out alternative flights, trains, and buses, ranking them by latency, price, and transfers to show you the best backup plan.
+> The system checks your flight status. If your flight is at risk of fog or cancelled, it maps out alternative flights, trains, and buses — ranked by latency, price, and transfers.
 
 ---
 
-## 🛠️ Quick Setup & Running Locally
+## Architecture
 
-Follow these steps to set up and run the project locally on your machine.
+```
+frontend (React/Vite :5173)
+    ↓ /api/*
+rerouting API (FastAPI :8000)
+    ↓ optional
+ml service (FastAPI :8001)   ← fog risk prediction (LightGBM)
+    ↓ optional
+Supabase (PostgreSQL)        ← subscriptions & refund requests
+```
+
+**Demo mode** — the app runs fully without Supabase or the ML service. Flight lookups and rerouting work offline using the built-in database. Subscribe and refund endpoints silently succeed.
+
+---
+
+## Quick Start (local demo)
 
 ### Prerequisites
-Make sure you have the following installed:
-* **Python 3.10+** & `pip`
-* **Node.js 18+** & `npm`
+- Python 3.13 (standard CPython, not MSYS2/MinGW)
+- Node.js 18+
+
+### 1. Environment
+
+```bash
+cd hecatron
+cp .env.example .env
+# Edit .env only if you have Supabase / API keys. Leave blank for demo mode.
+```
+
+### 2. Backend
+
+```bash
+# Windows
+.\venv\Scripts\activate
+# macOS/Linux
+source venv/bin/activate
+
+cd rerouting
+uvicorn api:app --reload --port 8000
+# API running at http://127.0.0.1:8000
+```
+
+If the venv is missing, recreate it:
+```bash
+# Windows (PowerShell)
+py -3.13 -m venv venv
+.\venv\Scripts\pip install -r rerouting\requirements.txt
+
+# macOS/Linux
+python3 -m venv venv
+source venv/bin/activate
+pip install -r rerouting/requirements.txt
+```
+
+### 3. Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+# App at http://localhost:5173
+```
 
 ---
 
-### Step 1: Configure Environment Variables (`.env`)
+## Demo flights to try
 
-A `.env` file is used to store private credentials securely (like database connections and API keys). 
-
-1. At the root of the project, copy the template file to create a `.env` file:
-   ```bash
-   cp .env.example .env
-   ```
-2. Open the newly created `.env` file and verify or fill in:
-   * **`SUPABASE_CONN_STRING`**: The connection string to your Supabase PostgreSQL instance.
-   * **`AVIATIONSTACK_API_KEY`**: Your API key for live flight validation (optional for local testing since our local mock flight list has pre-configured real flights).
+| Flight | Route | Status |
+|--------|-------|--------|
+| `RO 6769` | Iași → Milano | FOG RISK |
+| `OS 704` | Iași → Vienna | FOG RISK |
+| `FR 3113` | Iași → Bergamo | FOG RISK |
+| `RO 6771` | Iași → Londra | ON TIME |
+| `RO 707` | Iași → București | ON TIME |
 
 ---
 
-### Step 2: Run the Backend (FastAPI API)
+## Deploy to Render
 
-1. Open a new terminal window and navigate to the `rerouting` directory:
-   ```bash
-   cd rerouting
-   ```
-2. Activate your virtual environment (if you use one):
-   * **Linux/macOS**: `source ../venv/bin/activate`
-   * **Windows (CMD)**: `..\venv\Scripts\activate.bat`
-   * **Windows (PowerShell)**: `..\venv\Scripts\Activate.ps1`
-3. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Start the backend API server:
-   ```bash
-   python3 -m uvicorn api:app --reload --port 8000
-   ```
-   *The API will be running locally at `http://127.0.0.1:8000`.*
+The `render.yaml` at the repo root configures a web service for the backend.
+
+1. Push this repo to GitHub
+2. Create a new Render Web Service — connect the repo, Render detects `render.yaml` automatically
+3. Set secret env vars in the Render dashboard:
+   - `SUPABASE_CONN_STRING` (optional)
+   - `SUPABASE_URL` / `SUPABASE_KEY` (optional, for email notifications)
+   - `RESEND_API_KEY` (optional)
+   - `ALLOWED_ORIGINS` — set to your Vercel frontend URL, e.g. `https://hecatron.vercel.app`
+4. Deploy the frontend to Vercel/Netlify:
+   - Set `VITE_API_BASE` env var to your Render backend URL (e.g. `https://hecatron-api.onrender.com`)
+   - Build command: `npm run build`, output: `dist`
 
 ---
 
-### Step 3: Run the Frontend (React + Vite)
-
-1. Open a second terminal window and navigate to the `frontend` directory:
-   ```bash
-   cd frontend
-   ```
-2. Install the frontend dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the Vite development server:
-   ```bash
-   npm run dev
-   ```
-   *The website will open locally in your browser at `http://localhost:5173/`.*
-
----
-
-## 📡 API Endpoints
+## API Endpoints
 
 | Method | Endpoint | Description |
-|---|---|---|
+|--------|----------|-------------|
 | `GET` | `/health` | Health check |
-| `GET` | `/flight/{flight_number}` | Look up a flight details and departure schedules (e.g. `RO 6769`, `OS 704`, `RO 708`) |
-| `POST` | `/subscribe` | Register a passenger's email subscription for automated weather notifications |
-| `POST` | `/refund` | Submit passenger claim info for ticket refund or 110% airline credits |
-| `POST` | `/reroute` | Search for available ranked ground and air alternative travel options |
+| `GET` | `/flight/{flight_number}` | Flight details & fog risk status |
+| `POST` | `/subscribe` | Register email for weather alerts |
+| `POST` | `/refund` | Submit EU261 refund claim |
+| `POST` | `/reroute` | Get ranked alternative transport options |
 
 ---
 
-## 🔌 Transport Adapters
+## Transport Adapters
 
-The rerouting engine uses a plug-and-play **adapter pattern** — each transport source implements the same interface. If one adapter fails, it's skipped and the rest still work.
+Adapter pattern — each source implements the same interface. Failures are skipped.
 
 | Adapter | Source | Data |
-|---|---|---|
-| `adapter_flixbus.py` | FlixBus public API (no key needed) | Real-time bus trips with prices |
-| `adapter_train.py` | Static CFR timetable (hardcoded) | Iasi → Bucharest trains |
-| `adapter_gflights_cached.py` | Pre-scraped Google Flights JSON | 7 days of cached flight data |
+|---------|--------|------|
+| `adapter_flixbus.py` | FlixBus public API | Real-time bus trips |
+| `adapter_train.py` | CFR timetable (static) | Iași → București trains |
+| `adapter_gflights_cached.py` | Pre-scraped Google Flights | 7 days cached flight data |
 
-### Scoring
-
-Alternatives are ranked by a weighted score *(lower = better)*:
-
+**Scoring** (lower = better):
 ```
 score = 1.0 × arrival_lateness_hours + 0.05 × price_eur + 1.5 × transfers
 ```
 
-Options departing less than **1 hour** after the cancelled flight are filtered out (the passenger needs time to react). Ground transport over **10 hours** is also removed.
+---
+
+## ML Service (fog prediction)
+
+Located in `ml/`. Predicts `P(visibility < 1000m)` at 2h and 6h horizons using LightGBM + calibration.
+
+```bash
+cd ml
+pip install -e ".[serve]"   # or: uv sync --extra serve
+python train.py             # train model (requires historical METAR data)
+uvicorn app:app --port 8001
+```
+
+The rerouting API calls the ML service at `ML_API_URL` (default `http://localhost:8001`). If it's not running, flight status falls back to the hardcoded `status` field in `flights_db.py`.
+
+### ML Architecture
+```
+ingest → features → splits → model (LightGBM + calibration) → conformal → decision → FastAPI
+```
 
 ---
 
-## 🖥️ Frontend Screens
+## Data Pipeline
 
-1. **Home (Screen 1)** — Enter your flight number and email for alerts (automatically registers you in Supabase).
-2. **Flight Status (Screen 2)** — See dynamic route information (IAS ➔ Dest), schedule details, and status.
-3. **Flight Cancelled (Screen 3)** — EU261 options: request refund or view rerouting alternatives.
-4. **Alternatives (Screen 4)** — Ranked options showing flights, buses, and trains with prices, times, and booking links.
-5. **Refund Claim (Screen 5)** — Submit passenger personal info and booking PNR reference for claiming credits or original refund.
+METAR weather observations for LRIA:
+
+- `data-pipeline/backfill_metar.py` — load historical data into Supabase
+- `data-pipeline/live_ingest.py` — periodic ingest (cron / GitHub Actions)
+- `data-pipeline/create_subscriptions_table.py` — init subscriptions table
+- `data-pipeline/create_refunds_table.py` — init refund claims table
 
 ---
 
-## 🌦️ Data Pipeline
+## Frontend Screens
 
-The system ingests METAR weather observations for Iasi Airport (LRIA):
-
-- **`backfill_metar.py`** — Load historical data.
-- **`live_ingest.py`** — Runs periodically (cron / GitHub Actions) to keep data fresh.
-- **`create_subscriptions_table.py`** — Inits the subscriptions table.
-- **`create_refunds_table.py`** — Inits the refund claims table.
+1. **Home** — enter flight number + email (subscribes to alerts)
+2. **Flight Status** — route info, schedule, ON TIME / FOG RISK status
+3. **Cancelled** — EU261 options: refund or find alternatives
+4. **Alternatives** — ranked flights, buses, trains with prices and booking links
+5. **Refund Claim** — submit passenger info and PNR for EU261 credits

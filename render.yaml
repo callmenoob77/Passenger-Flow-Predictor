@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: hecatron-api
+    runtime: python
+    buildCommand: pip install -r rerouting/requirements.txt
+    startCommand: cd rerouting && uvicorn api:app --host 0.0.0.0 --port $PORT
+    rootDir: .
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: SUPABASE_CONN_STRING
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: onboarding@resend.dev
+      - key: ML_API_URL
+        value: ""
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+  - type: web
+    name: hecatron-ml
+    runtime: python
+    rootDir: .
+    buildCommand: pip install -e "ml/.[serve]"
+    startCommand: cd ml && uvicorn app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12"
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: onboarding@resend.dev

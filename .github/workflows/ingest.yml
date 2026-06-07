@@ -17,3 +17,14 @@ jobs:
       - run: python data-pipeline/live_ingest.py
         env:
           SUPABASE_CONN_STRING: ${{ secrets.SUPABASE_CONN_STRING }}
+
+      - name: Trigger ML fog prediction
+        if: ${{ env.ML_SERVICE_URL != '' }}
+        continue-on-error: true
+        run: |
+          echo "Triggering ML run at $ML_SERVICE_URL/run"
+          curl -sf --max-time 30 "$ML_SERVICE_URL/run" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"alert={d['prediction']['alert']} prob={d['prediction']['prob']} emails_sent={d['emails_sent']}\")" \
+            || echo "ML service unreachable (non-fatal, continuing)"
+        env:
+          ML_SERVICE_URL: ${{ secrets.ML_SERVICE_URL }}
