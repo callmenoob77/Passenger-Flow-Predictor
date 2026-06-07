@@ -1,0 +1,9 @@
+{
+  "horizon": "2h",
+  "visibility_m": 400,
+  "temperature_c": 3.0,
+  "dewpoint_c": 2.5,
+  "wind_speed_mps": 1.2,
+  "wind_dir_deg": 180,
+  "flight_code": "NI 1664"
+}
