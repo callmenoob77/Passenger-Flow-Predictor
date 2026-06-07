@@ -18,7 +18,6 @@ ADAPTERS = [flixbus_adapter, train_adapter, gflights_cached_adapter]
 
 import sys
 from pathlib import Path
-# Add project root to sys.path so we can import config.py
 sys.path.append(str(Path(__file__).parent.parent))
 
 from config import CONN

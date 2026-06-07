@@ -1,0 +1,37 @@
+# Environment / secrets
+.env
+
+# Virtual environment
+.venv/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Data — raw downloads are reproducible via ingest
+data/raw/
+*.parquet
+*.pkl
+*.csv.gz
+
+# Logs
+logs/
+*.log
+
+# Model artefacts (committed separately or tracked via DVC)
+models/
+
+# Build / packaging
+dist/
+build/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
