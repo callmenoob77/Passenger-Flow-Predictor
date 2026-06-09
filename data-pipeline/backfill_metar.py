@@ -31,17 +31,28 @@ r.raise_for_status()
 df = pd.read_csv(io.StringIO(r.text), na_values=["M", "T"])
 print(f"{len(df)} raw rows.")
 
+# Same column mapping as live_ingest.py — both scripts feed the same metar_raw table.
 # valid is UTC (we requested tz=Etc/UTC) but without timezone in the string -> mark explicitly as UTC
-df["valid"] = pd.to_datetime(df["valid"]).dt.tz_localize("UTC")
+df["airport_icao"]           = df["station"]
+df["observed_at"]            = pd.to_datetime(df["valid"]).dt.tz_localize("UTC")
+df["temp_c"]                 = (df["tmpf"] - 32) * 5 / 9
+df["dewpoint_c"]             = (df["dwpf"] - 32) * 5 / 9
+df["humidity_pct"]           = df["relh"]
+df["visibility_mi"]          = df["vsby"]
+df["wind_speed_kt"]          = df["sknt"]
+df["wind_dir_deg"]           = df["drct"]
+df["pressure_inhg"]          = df["alti"]
+df["sea_level_pressure_hpa"] = df["mslp"]
+df["cloud_cover"]            = df["skyc1"]
+df["cloud_base_ft"]          = df["skyl1"]
+df["weather_codes"]          = df["wxcodes"]
+df["raw_metar"]              = df["metar"]
+df["source"]                 = "backfill"
 
-# F -> C; vsby stays in miles (just renamed to vsby_mi)
-df["tmpc"] = (df["tmpf"] - 32) * 5 / 9
-df["dwpc"] = (df["dwpf"] - 32) * 5 / 9
-df["vsby_mi"] = df["vsby"]
-df["source"] = "backfill"
-
-cols = ["station", "valid", "tmpc", "dwpc", "relh", "vsby_mi", "sknt",
-        "drct", "alti", "mslp", "skyc1", "skyl1", "wxcodes", "metar", "source"]
+cols = ["airport_icao", "observed_at", "temp_c", "dewpoint_c", "humidity_pct",
+        "visibility_mi", "wind_speed_kt", "wind_dir_deg", "pressure_inhg",
+        "sea_level_pressure_hpa", "cloud_cover", "cloud_base_ft",
+        "weather_codes", "raw_metar", "source"]
 out = df[cols].where(pd.notnull(df[cols]), None)  # NaN -> None for SQL NULL
 rows = list(out.itertuples(index=False, name=None))
 
@@ -51,12 +62,12 @@ cur = conn.cursor()
 sql = f"""
     INSERT INTO metar_raw ({",".join(cols)})
     VALUES %s
-    ON CONFLICT (station, valid) DO NOTHING
+    ON CONFLICT (airport_icao, observed_at) DO NOTHING
 """
 execute_values(cur, sql, rows, page_size=1000)
 conn.commit()
 
-cur.execute("SELECT count(*), min(valid), max(valid) FROM metar_raw WHERE station = %s", (STATION,))
+cur.execute("SELECT count(*), min(observed_at), max(observed_at) FROM metar_raw WHERE airport_icao = %s", (STATION,))
 print("In DB now:", cur.fetchone())
 cur.close()
 conn.close()

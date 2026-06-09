@@ -81,6 +81,14 @@ def resolve(flight: Flight, adapters: list, top_n: int = 3) -> list:
     # ground transport to final destination only makes sense for reasonable distances
     options = [o for o in options
                if not (o.mode in ("bus", "train") and (o.duration_h or 0) > MAX_GROUND_H)]
+    # dedupe identical journeys surfaced by multiple adapters
+    # (e.g. cached Google-Flights vs live nearby-airport data) — keep the best-scored
+    best: dict = {}
+    for o in options:
+        k = (o.mode, o.depart, o.arrive)
+        if k not in best or score(o, flight) < score(best[k], flight):
+            best[k] = o
+    options = list(best.values())
     options.sort(key=lambda o: score(o, flight))
     return options[:top_n]
 

@@ -19,12 +19,30 @@ jobs:
           SUPABASE_CONN_STRING: ${{ secrets.SUPABASE_CONN_STRING }}
 
       - name: Trigger ML fog prediction
-        if: ${{ env.ML_SERVICE_URL != '' }}
         continue-on-error: true
         run: |
+          if [ -z "$ML_SERVICE_URL" ]; then
+            echo "ML_SERVICE_URL secret not set — skipping ML trigger"
+            exit 0
+          fi
           echo "Triggering ML run at $ML_SERVICE_URL/run"
           curl -sf --max-time 30 "$ML_SERVICE_URL/run" \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(f\"alert={d['prediction']['alert']} prob={d['prediction']['prob']} emails_sent={d['emails_sent']}\")" \
             || echo "ML service unreachable (non-fatal, continuing)"
         env:
           ML_SERVICE_URL: ${{ secrets.ML_SERVICE_URL }}
+
+      # Wakes the (possibly sleeping) API and runs one departure-aware
+      # notification pass — emails go out ~2h before disrupted flights.
+      - name: Trigger passenger notifications
+        continue-on-error: true
+        run: |
+          if [ -z "$API_SERVICE_URL" ]; then
+            echo "API_SERVICE_URL secret not set — skipping notifier trigger"
+            exit 0
+          fi
+          echo "Triggering notifier at $API_SERVICE_URL/notify/run"
+          curl -sf --max-time 60 -X POST "$API_SERVICE_URL/notify/run" \
+            || echo "API unreachable (non-fatal, continuing)"
+        env:
+          API_SERVICE_URL: ${{ secrets.API_SERVICE_URL }}

@@ -1,7 +1,8 @@
 """
-Live ingest METAR LRIA: last 3 hours -> Supabase (metar_raw).
-Runs on GitHub Actions every 15 min. Connection string comes from env (GitHub Secret),
-NOT from code -> password never ends up in the repo.
+Live ingest METAR LRIA: last 24 hours -> Supabase (metar_raw).
+Runs on GitHub Actions every 15 min (the 24h window + ON CONFLICT DO NOTHING
+makes it self-healing if a few runs are missed). Connection string comes from
+env (GitHub Secret), NOT from code -> password never ends up in the repo.
 """
 
 import sys

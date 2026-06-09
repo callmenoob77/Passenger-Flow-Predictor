@@ -6,7 +6,6 @@ build-backend = "hatchling.build"
 name        = "lria-fog-ml"
 version     = "0.1.0"
 description = "Fog-disruption prediction ML engine for Iași airport (LRIA)"
-readme      = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "scikit-learn>=1.5",

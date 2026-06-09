@@ -1,6 +1,7 @@
 // screen5.tsx — Refund & Credits Claim Screen
 import React, { useState } from "react";
 import logo from "../assets/Logo.png";
+import { api } from "../lib/api";
 
 const outfitFont = document.createElement("link");
 outfitFont.rel = "stylesheet";
@@ -217,11 +218,10 @@ export default function Screen5({
     if (!phone.trim()) return setFormError("Phone Number is required.");
     if (pnr.trim().length !== 6 || !/^[a-zA-Z0-9]+$/.test(pnr)) return setFormError("Booking Reference (PNR) must be a 6-character alphanumeric code.");
 
-    setLoading(false);
     setLoading(true);
 
     try {
-      const res = await fetch("/api/refund", {
+      const res = await fetch(api("/refund"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

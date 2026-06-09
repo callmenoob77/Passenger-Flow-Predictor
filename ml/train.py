@@ -104,7 +104,7 @@ def download_iem_station(
     # Convert Fahrenheit → Celsius
     for col in ("tmpf", "dwpf"):
         if col in df.columns:
-            df[col] = (df[col].astype(float, errors="ignore") - 32) * 5 / 9
+            df[col] = (pd.to_numeric(df[col], errors="coerce") - 32) * 5 / 9
 
     # Convert visibility statute miles → metres
     if "vsby" in df.columns:

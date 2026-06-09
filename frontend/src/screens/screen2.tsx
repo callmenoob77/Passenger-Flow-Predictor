@@ -116,12 +116,6 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontFamily: "'Outfit', sans-serif",
     background: "#CAD5E8",
   },
-  pillOnTime: {
-    color: "#6DD400",
-  },
-  pillFogRisk: {
-    color: "#F5A623",
-  },
   button: {
     width: "100%",
     padding: "18px",
@@ -169,6 +163,14 @@ type Screen2Props = {
   onAlternatives: () => void;
 };
 
+// Status values returned by the backend (live API or demo DB)
+const STATUS_UI: Record<string, { label: string; color: string }> = {
+  ON_TIME:   { label: "ON TIME",   color: "#6DD400" },
+  FOG_RISK:  { label: "FOG RISK",  color: "#F5A623" },
+  DELAYED:   { label: "DELAYED",   color: "#F5A623" },
+  CANCELLED: { label: "CANCELLED", color: "#F04E23" },
+};
+
 const formatDeparture = (isoStr?: string) => {
   if (!isoStr) return "N/A";
   try {
@@ -197,11 +199,12 @@ export default function Screen2({
   onActivate,
   onAlternatives,
 }: Screen2Props) {
-  const isFogRisk = status === "FOG_RISK";
+  const statusUi = STATUS_UI[status] ?? STATUS_UI.ON_TIME;
+  const isDisrupted = status !== "ON_TIME"; // FOG_RISK, DELAYED, CANCELLED
 
   // Use the 3-letter IATA code if ICAO is LRIA (since image displays IAS)
   const displayOrigin = originIcao === "LRIA" ? "IAS" : originIcao;
-  const displayDest = destIcao === "MXP" ? "MXP" : destIcao; // MXP is already 3-letter
+  const displayDest = destIcao; // already a 3-letter IATA code (MXP, OTP, ...)
 
   return (
     <div style={styles.page}>
@@ -266,18 +269,13 @@ export default function Screen2({
         {/* Status pill */}
         <div style={styles.statusRow}>
           <p style={styles.statusLabel}>Status:</p>
-          <span
-            style={{
-              ...styles.pill,
-              ...(isFogRisk ? styles.pillFogRisk : styles.pillOnTime),
-            }}
-          >
-            {isFogRisk ? "FOG RISK" : "ON TIME"}
+          <span style={{ ...styles.pill, color: statusUi.color }}>
+            {statusUi.label}
           </span>
         </div>
 
         {/* Button — changes depending on status */}
-        {isFogRisk && (
+        {isDisrupted && (
           <>
             <button style={styles.button} onClick={onAlternatives}>
               Check Alternatives To Your Flight
@@ -294,7 +292,7 @@ export default function Screen2({
           </>
         )}
 
-        {!isFogRisk && (
+        {!isDisrupted && (
           <div
             style={{
               background: "#CAD5E8",

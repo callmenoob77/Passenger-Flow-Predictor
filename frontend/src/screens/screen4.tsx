@@ -56,7 +56,8 @@ const fmtDur = (h?: number) => {
   return mm ? `${hh}h ${mm}m` : `${hh}h`;
 };
 
-const fmtPrice = (usd?: number) => (usd == null ? "—" : `~€${Math.round(usd * 0.92)}`);
+// All adapters return prices already in EUR (the backend converts USD cache prices).
+const fmtPrice = (eur?: number) => (eur == null ? "—" : `~€${Math.round(eur)}`);
 
 interface ModeConfig {
   label: string;

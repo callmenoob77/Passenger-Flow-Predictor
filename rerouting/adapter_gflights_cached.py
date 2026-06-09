@@ -15,6 +15,15 @@ try:
 except Exception:
     _CACHE = {}
 
+USD_TO_EUR = 0.92  # cache prices are scraped in USD; convert so all adapters return EUR
+
+# Reachability (same rules as adapter_nearby_flights):
+REACT_H          = 1.0  # passenger needs time to react after the alert
+CHECKIN_BUFFER_H = 1.5  # check-in cutoff at the alternative airport
+# A flight from the SAME fogged-in airport is only a credible alternative once
+# the fog has had time to clear; skip departures inside this window.
+SAME_AIRPORT_COOLDOWN_H = 6.0
+
 
 def _price(s):
     try:
@@ -62,22 +71,36 @@ def gflights_cached_adapter(flight: Flight) -> list:
             continue
         dep = datetime.combine(qdate, t)          # always on the requested date
         arr = dep + timedelta(hours=dur)          # arrival = departure + duration
-        if dep <= flight.scheduled_departure:
-            continue  # only flights departing AFTER the cancelled flight
+
+        ground_h = float(r.get("ground_h") or 0.0)
+        same_airport = r.get("from_city", "").lower() == flight.origin_city.lower()
+        if same_airport:
+            # same airport is fogged in — only offer departures after a clearing window
+            if dep < flight.scheduled_departure + timedelta(hours=SAME_AIRPORT_COOLDOWN_H):
+                continue
+        else:
+            # must be physically reachable: react + ground transfer + check-in
+            if dep < flight.scheduled_departure + timedelta(hours=REACT_H + ground_h + CHECKIN_BUFFER_H):
+                continue
+
         k = (r.get("provider"), r.get("from_iata"), r.get("dep_str"), r.get("price_usd"))
         if k in seen:
             continue
         seen.add(k)
-        transfers = 0 if r.get("from_city","").lower() == flight.origin_city.lower() else 1
+        transfers = 0 if same_airport else 1
         provider = r.get("provider","?")
         if transfers:
             provider = f"{provider} (from {r.get('from_city')})"
+        raw = {"ground_h": ground_h, "stops": r.get("stops"),
+               "price_usd": price, "cached_date": r.get("date")}
+        if same_airport:
+            raw["note"] = "departs from the disrupted airport — verify fog has cleared"
         out.append(Option(
             mode="flight", provider=provider,
-            depart=dep, arrive=arr, duration_h=dur, price_eur=price,  # USD
+            depart=dep, arrive=arr, duration_h=dur,
+            price_eur=round(price * USD_TO_EUR, 2),
             transfers=transfers, deep_link="https://www.google.com/travel/flights",
-            raw={"ground_h": r.get("ground_h"), "stops": r.get("stops"),
-                 "currency": "USD", "cached_date": r.get("date")},
+            raw=raw,
         ))
     out.sort(key=lambda o: (o.arrive or datetime.max, o.price_eur or 9999))
     return out
@@ -90,4 +113,4 @@ if __name__ == "__main__":
         f = Flight("Iasi", "IAS", dest, "", datetime.strptime(days[2], "%Y-%m-%d").replace(hour=7))
         print(f"\n=== {dest}, {f.scheduled_departure.date()} ===")
         for o in gflights_cached_adapter(f)[:4]:
-            print(f"  {o.provider:26} {o.depart:%H:%M}->{o.arrive:%H:%M} | {o.duration_h}h | ${o.price_eur} | t={o.transfers}")
+            print(f"  {o.provider:26} {o.depart:%H:%M}->{o.arrive:%H:%M} | {o.duration_h}h | EUR {o.price_eur} | t={o.transfers}")

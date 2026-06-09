@@ -107,8 +107,9 @@ const handleSend = () => {
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-  // 2-character carrier code (e.g., RO, W6, FR) + space + 1 to 4 digits
-  const flightRegex = /^[A-Z][A-Z0-9]\s\d{1,4}$/;
+  // 2-character carrier code (e.g., RO, W6, FR) + optional space + 1 to 4 digits
+  // (the backend normalises spacing, so "RO6769" and "RO 6769" both work)
+  const flightRegex = /^[A-Z][A-Z0-9]\s?\d{1,4}$/;
 
   let hasError = false;
 

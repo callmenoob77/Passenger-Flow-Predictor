@@ -2,7 +2,7 @@
 
 > 🏆 Built at **[Air Hack Iași](https://fablabiasi.ro/air-hack-iasi/)** (Heckatron hackathon) for the **Passenger Flow Predictor** challenge.
 
-Fog is the single biggest disruptor at Iași Airport (LRIA). During peak hours, gate closures trigger cascading delays, passengers miss connections, and staff allocation is purely reactive. **Hecatron** flips this: it predicts fog-related flight disruptions **2 and 6 hours in advance**, automatically alerts affected passengers by email, and surfaces ranked alternative transport options — so both passengers and airport staff can act before the problem escalates.
+Fog is the single biggest disruptor at Iași Airport (LRIA). During peak hours, gate closures trigger cascading delays, passengers miss connections, and staff allocation is purely reactive. **Hecatron** flips this: it predicts fog-related flight disruptions **2 hours in advance**, automatically alerts affected passengers by email, and surfaces ranked alternative transport options — so both passengers and airport staff can act before the problem escalates.
 
 ---
 
@@ -20,9 +20,12 @@ Fog is the single biggest disruptor at Iași Airport (LRIA). During peak hours, 
 
 ## What it does
 
-1. **Predicts fog risk** at LRIA using a LightGBM model trained on historical METAR weather observations from Iași and three neighbouring airports. Outputs a calibrated probability (0–100%) and a tiered alert level (strong / soft / silent) for 2h and 6h horizons.
-2. **Monitors flights** — passengers subscribe with their flight number and email. When fog risk crosses a threshold, they receive an automatic alert.
-3. **Recommends alternatives** — rerouting engine queries real-time buses (FlixBus), CFR trains, and cached flights, ranks them by a latency-price-transfers score, and returns booking links.
+1. **Predicts fog risk** at LRIA using a calibrated decision-tree ensemble (scikit-learn BaggingClassifier) trained on historical METAR weather observations from Iași and three neighbouring airports. Outputs a calibrated probability (0–100%) with an uncertainty band and a tiered alert level (full_risk / early_warning / silent) for a 2-hour horizon.
+2. **Monitors flights** — passengers subscribe with their flight number and email. A departure-aware notifier emails each subscriber once, **`ALERT_LEAD_H` hours (default 2) before their flight departs**, if the flight is cancelled/delayed on the airport board or the fog model fires (needs `SUPABASE_CONN_STRING` + `RESEND_API_KEY` on the rerouting API). Flight data is resolved live, best source first:
+   1. **Iași airport departures board** (the airport's own public API — free, no key, no quota; real status incl. delayed/cancelled and real departure times)
+   2. **AviationStack** (any flight worldwide; optional `AVIATIONSTACK_API_KEY`)
+   3. **Built-in demo flight DB** (always works, fully offline)
+3. **Recommends alternatives** — rerouting engine queries real-time buses (FlixBus), CFR trains, cached flights, and **flights from nearby airports** (Bacău, Suceava, Chișinău — each paired with a real FlixBus/CFR ground leg from Iași that makes the departure), ranks everything by a latency-price-transfers score, and returns booking links.
 4. **Supports EU 261/2004 refund claims** — passengers can submit refund requests directly through the app.
 
 ---
@@ -43,7 +46,7 @@ Fog is the single biggest disruptor at Iași Airport (LRIA). During peak hours, 
 ┌───────────▼──────────┐  ┌────────▼──────────────────────────┐
 │  ML Service           │  │  Supabase (PostgreSQL)            │
 │  (FastAPI :8001)      │  │  metar_raw · subscriptions        │
-│  LightGBM fog model   │  │  refund_claims                    │
+│  Bagged-tree ensemble │  │  refund_claims                    │
 └──────────────────────┘  └───────────────────────────────────┘
             ▲
             │ METAR feed (every 15 min via GitHub Actions)
@@ -64,7 +67,7 @@ Fog is the single biggest disruptor at Iași Airport (LRIA). During peak hours, 
 |-------|------------|
 | Frontend | React 18, TypeScript, Vite |
 | Rerouting API | Python 3.12+, FastAPI, Uvicorn |
-| ML service | LightGBM, scikit-learn, pandas, FastAPI |
+| ML service | scikit-learn (bagged decision trees), pandas, FastAPI |
 | Database | Supabase (PostgreSQL) |
 | Email alerts | Resend |
 | MLOps | GitHub Actions (ingest every 15 min, retrain weekly) |
@@ -75,19 +78,19 @@ Fog is the single biggest disruptor at Iași Airport (LRIA). During peak hours, 
 ## ML Pipeline
 
 ```
-METAR ingest → feature engineering → time-series splits
-    → LightGBM classifier (scale_pos_weight auto-computed)
-    → isotonic calibration on validation set
-    → conformal prediction intervals (split-conformal, α=0.20)
-    → tiered alert decision engine (strong / soft / silent)
-    → FastAPI inference endpoint (/predict, /nowcast)
+METAR ingest (IEM ASOS, 4 stations) → feature engineering
+    → chronological split (60% train / 20% calibration / 20% test)
+    → BaggingClassifier (200 class-balanced decision trees)
+    → isotonic calibration (mean + p10/p90 → uncertainty band)
+    → recall-targeted alert thresholds (full_risk / early_warning / silent)
+    → FastAPI inference endpoint (/predict_fog, /run)
 ```
 
-**Features** (50+): visibility, humidity, dew-point depression, pressure tendency, wind speed/direction (circular encoding), lag features (1h/2h/3h/6h), rolling means, hourly/seasonal cyclical encoding, plus advection signals from three neighbouring stations (LRSV, LRBC, LUKK).
+**Features** (30): visibility, temperature, dew point, dew-point depression (spread), Magnus relative humidity, wind speed/direction (circular encoding), hourly/seasonal cyclical encoding, plus the same signals from three neighbouring stations (LRSV, LRBC, LUKK) as fog-advection indicators.
 
-**Targets**: `fog_in_2h` and `fog_in_6h` — binary, `P(visibility < 1000 m)`.
+**Target**: `fog_in_2h` — binary, fog at T+2h defined as `visibility < 1000 m` or `FG` in the weather codes.
 
-**Baselines**: logistic regression + persistence model. LightGBM is compared against both on held-out test folds.
+**Evaluation**: held-out test metrics (recall/precision/F1 per tier, Brier score, CI width) are written to `ml/models/meta.json` on every retrain.
 
 ---
 
@@ -100,8 +103,8 @@ METAR ingest → feature engineering → time-series splits
 ### 1. Clone & configure environment
 
 ```bash
-git clone https://github.com/callmenoob77/hecatron.git
-cd hecatron
+git clone https://github.com/callmenoob77/Fog-Disruptor.git
+cd Fog-Disruptor
 cp .env.example .env
 # Leave .env blank for demo mode (no Supabase or ML service required).
 # Fill in keys only if you want full functionality (see Environment Variables below).
@@ -151,6 +154,8 @@ The rerouting API automatically falls back to static flight status when the ML s
 
 ## Demo flights
 
+> Any real Iași departure works out of the box — looked up live on the airport's departures board (no key needed). With `AVIATIONSTACK_API_KEY` set, non-Iași flights work too. The flights below are always available, even fully offline:
+
 | Flight | Route | Status |
 |--------|-------|--------|
 | `RO 6769` | Iași → Milano | FOG RISK |
@@ -176,7 +181,9 @@ The rerouting API automatically falls back to static flight status when the ML s
 score = 1.0 × arrival_lateness_hours + 0.05 × price_eur + 1.5 × transfers
 ```
 
-Transport adapters: FlixBus (real-time), CFR trains (static timetable), Google Flights (7-day cache). Adapter failures are silently skipped.
+Transport adapters: FlixBus (real-time), CFR trains (static timetable: Iași → Bucharest / Bacău / Suceava), Google Flights (7-day cache), and nearby-airport flights (live departures from Bacău BCM, Suceava SCV and Chișinău KIV via AviationStack, combined with a FlixBus/CFR ground leg from Iași that arrives ≥ 1.5 h before the flight). Adapter failures are silently skipped; identical journeys from different adapters are deduplicated.
+
+**Reachability rules** (fog scenario): every flight from another airport must be physically catchable — 1 h passenger reaction + real ground travel time + 1.5 h check-in. Flights from the disrupted airport itself are only offered after a 6 h fog-clearing window, and carry a "verify fog has cleared" note.
 
 ---
 
@@ -221,6 +228,8 @@ GitHub Actions automates everything in production:
 | `SUPABASE_URL` | No | Supabase project URL (email notifications) |
 | `SUPABASE_KEY` | No | Supabase anon/service key |
 | `RESEND_API_KEY` | No | [Resend](https://resend.com) key for email alerts |
+| `AVIATIONSTACK_API_KEY` | No | [AviationStack](https://aviationstack.com) key — adds live lookup of non-Iași flights and live rerouting via Bacău/Suceava/Chișinău departures (Iași lookups already work via the airport board, no key needed) |
+| `LRIA_BOARD_URL` | No | Override/disable the Iași airport board API (default: `https://www.aeroport-iasi.ro:5000`; set empty to disable) |
 | `ML_API_URL` | No | URL of the ML service (default: `http://localhost:8001`) |
 | `ALLOWED_ORIGINS` | No | Comma-separated CORS origins for the backend |
 | `VITE_API_BASE` | No (frontend) | Backend URL used by the React app |
@@ -232,7 +241,7 @@ All variables are optional for local demo mode.
 ## Project Structure
 
 ```
-hecatron/
+Fog-Disruptor/
 ├── frontend/          # React + TypeScript UI
 │   └── src/screens/   # 5 screens: home, status, cancelled, alternatives, refund
 ├── rerouting/         # FastAPI rerouting API + transport adapters

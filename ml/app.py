@@ -36,7 +36,7 @@ _POLL_INTERVAL = 600  # seconds (10 minutes)
 # ---------------------------------------------------------
 # Config
 # ---------------------------------------------------------
-MODEL_DIR         = Path("models")
+MODEL_DIR         = Path(__file__).parent / "models"
 NEIGHBOR_STATIONS = ("LRSV", "LRBC", "LUKK")
 NOAA_URL          = "https://aviationweather.gov/api/data/metar"
 
@@ -399,9 +399,6 @@ def _predict(X: pd.DataFrame) -> tuple[float, float, float]:
 # Endpoints
 # ---------------------------------------------------------
 
-INPUT_PATH = Path("data/input.json")
-
-
 def _supabase_headers() -> dict:
     return {
         "apikey": _SUPABASE_KEY,
@@ -557,9 +554,6 @@ def _execute_run(req: PredictRequest) -> RunResponse:
     return RunResponse(prediction=prediction, emails_sent=sent, emails_total=total)
 
 
-INPUT_PATH = Path("data/input.json")
-
-
 @app.get("/run", response_model=RunResponse)
 def run():
     """Live trigger: fetches current METAR from IEM for LRIA, runs model, sends emails if fog."""
@@ -632,4 +626,4 @@ def predict_fog(req: PredictRequest):
 if __name__ == "__main__":
     import uvicorn
     logging.basicConfig(level=logging.INFO)
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=False)
+    uvicorn.run("app:app", host="0.0.0.0", port=8001, reload=False)
