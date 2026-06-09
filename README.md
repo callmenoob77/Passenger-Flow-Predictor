@@ -1,78 +1,155 @@
 # Hecatron — Fog Copilot
 
-A passenger rerouting system that helps travelers find alternative transport when flights are cancelled due to fog at Iași Airport (LRIA).
+> 🏆 Built at **[Air Hack Iași](https://fablabiasi.ro/air-hack-iasi/)** (Heckatron hackathon) for the **Passenger Flow Predictor** challenge.
 
-> The system checks your flight status. If your flight is at risk of fog or cancelled, it maps out alternative flights, trains, and buses — ranked by latency, price, and transfers.
+Fog is the single biggest disruptor at Iași Airport (LRIA). During peak hours, gate closures trigger cascading delays, passengers miss connections, and staff allocation is purely reactive. **Hecatron** flips this: it predicts fog-related flight disruptions **2 and 6 hours in advance**, automatically alerts affected passengers by email, and surfaces ranked alternative transport options — so both passengers and airport staff can act before the problem escalates.
+
+---
+
+## Screenshots
+
+| Home | Flight Status | Cancelled |
+|------|--------------|-----------|
+| ![Home](screenshots/01-home.png) | ![Flight Status](screenshots/02-flight-status.png) | ![Cancelled](screenshots/03-cancelled.png) |
+
+| Alternatives | Refund Claim | On Time |
+|-------------|--------------|---------|
+| ![Alternatives](screenshots/04-alternatives.png) | ![Refund](screenshots/05-refund.png) | ![On Time](screenshots/06-on-time.png) |
+
+---
+
+## What it does
+
+1. **Predicts fog risk** at LRIA using a LightGBM model trained on historical METAR weather observations from Iași and three neighbouring airports. Outputs a calibrated probability (0–100%) and a tiered alert level (strong / soft / silent) for 2h and 6h horizons.
+2. **Monitors flights** — passengers subscribe with their flight number and email. When fog risk crosses a threshold, they receive an automatic alert.
+3. **Recommends alternatives** — rerouting engine queries real-time buses (FlixBus), CFR trains, and cached flights, ranks them by a latency-price-transfers score, and returns booking links.
+4. **Supports EU 261/2004 refund claims** — passengers can submit refund requests directly through the app.
 
 ---
 
 ## Architecture
 
 ```
-frontend (React/Vite :5173)
-    ↓ /api/*
-rerouting API (FastAPI :8000)
-    ↓ optional
-ml service (FastAPI :8001)   ← fog risk prediction (LightGBM)
-    ↓ optional
-Supabase (PostgreSQL)        ← subscriptions & refund requests
+┌─────────────────────────────────────────────────────────────┐
+│                 Frontend  (React + TypeScript + Vite)        │
+│  Home → Flight Status → Cancelled → Alternatives → Refund   │
+└───────────────────────┬─────────────────────────────────────┘
+                        │ HTTP /api/*
+┌───────────────────────▼─────────────────────────────────────┐
+│            Rerouting API  (FastAPI :8000)                    │
+│  flight lookup · rerouting · subscriptions · refund claims  │
+└───────────┬───────────────────────┬─────────────────────────┘
+            │ ML_API_URL (optional) │ DB (optional)
+┌───────────▼──────────┐  ┌────────▼──────────────────────────┐
+│  ML Service           │  │  Supabase (PostgreSQL)            │
+│  (FastAPI :8001)      │  │  metar_raw · subscriptions        │
+│  LightGBM fog model   │  │  refund_claims                    │
+└──────────────────────┘  └───────────────────────────────────┘
+            ▲
+            │ METAR feed (every 15 min via GitHub Actions)
+┌───────────┴──────────────────────────────────────────────────┐
+│  Data Pipeline  (GitHub Actions)                              │
+│  Aviation Weather Center → Supabase                          │
+│  Model retrain: weekly (Monday 03:00 UTC)                    │
+└───────────────────────────────────────────────────────────────┘
 ```
 
-**Demo mode** — the app runs fully without Supabase or the ML service. Flight lookups and rerouting work offline using the built-in database. Subscribe and refund endpoints silently succeed.
+**Demo mode** — the app runs fully without Supabase or the ML service. Flight lookups and rerouting work offline via a built-in flight database.
 
 ---
 
-## Quick Start (local demo)
+## Tech stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18, TypeScript, Vite |
+| Rerouting API | Python 3.12+, FastAPI, Uvicorn |
+| ML service | LightGBM, scikit-learn, pandas, FastAPI |
+| Database | Supabase (PostgreSQL) |
+| Email alerts | Resend |
+| MLOps | GitHub Actions (ingest every 15 min, retrain weekly) |
+| Hosting | Render (backend) + Vercel (frontend) |
+
+---
+
+## ML Pipeline
+
+```
+METAR ingest → feature engineering → time-series splits
+    → LightGBM classifier (scale_pos_weight auto-computed)
+    → isotonic calibration on validation set
+    → conformal prediction intervals (split-conformal, α=0.20)
+    → tiered alert decision engine (strong / soft / silent)
+    → FastAPI inference endpoint (/predict, /nowcast)
+```
+
+**Features** (50+): visibility, humidity, dew-point depression, pressure tendency, wind speed/direction (circular encoding), lag features (1h/2h/3h/6h), rolling means, hourly/seasonal cyclical encoding, plus advection signals from three neighbouring stations (LRSV, LRBC, LUKK).
+
+**Targets**: `fog_in_2h` and `fog_in_6h` — binary, `P(visibility < 1000 m)`.
+
+**Baselines**: logistic regression + persistence model. LightGBM is compared against both on held-out test folds.
+
+---
+
+## How to run locally
 
 ### Prerequisites
-- Python 3.13 (standard CPython, not MSYS2/MinGW)
+- Python 3.12+ (standard CPython, not MSYS2/MinGW)
 - Node.js 18+
 
-### 1. Environment
+### 1. Clone & configure environment
 
 ```bash
+git clone https://github.com/callmenoob77/hecatron.git
 cd hecatron
 cp .env.example .env
-# Edit .env only if you have Supabase / API keys. Leave blank for demo mode.
+# Leave .env blank for demo mode (no Supabase or ML service required).
+# Fill in keys only if you want full functionality (see Environment Variables below).
 ```
 
-### 2. Backend
+### 2. Start the rerouting backend
 
 ```bash
-# Windows
-.\venv\Scripts\activate
-# macOS/Linux
-source venv/bin/activate
-
-cd rerouting
-uvicorn api:app --reload --port 8000
-# API running at http://127.0.0.1:8000
-```
-
-If the venv is missing, recreate it:
-```bash
-# Windows (PowerShell)
-py -3.13 -m venv venv
-.\venv\Scripts\pip install -r rerouting\requirements.txt
-
 # macOS/Linux
 python3 -m venv venv
 source venv/bin/activate
 pip install -r rerouting/requirements.txt
+
+# Windows (PowerShell)
+py -3.12 -m venv venv
+.\venv\Scripts\activate
+pip install -r rerouting\requirements.txt
+
+# Then start the server (from repo root, venv active):
+cd rerouting
+uvicorn api:app --reload --port 8000
+# → http://127.0.0.1:8000
 ```
 
-### 3. Frontend
+### 3. Start the frontend
 
 ```bash
 cd frontend
 npm install
 npm run dev
-# App at http://localhost:5173
+# → http://localhost:5173
 ```
+
+### 4. (Optional) Start the ML fog prediction service
+
+```bash
+cd ml
+pip install -e ".[serve]"        # or: uv sync --extra serve
+python train.py                  # requires Supabase METAR data (see Data Pipeline)
+uvicorn app:app --port 8001
+# → http://127.0.0.1:8001
+```
+
+The rerouting API automatically falls back to static flight status when the ML service is not running.
 
 ---
 
-## Demo flights to try
+## Demo flights
 
 | Flight | Route | Status |
 |--------|-------|--------|
@@ -84,87 +161,92 @@ npm run dev
 
 ---
 
-## Deploy to Render
-
-The `render.yaml` at the repo root configures a web service for the backend.
-
-1. Push this repo to GitHub
-2. Create a new Render Web Service — connect the repo, Render detects `render.yaml` automatically
-3. Set secret env vars in the Render dashboard:
-   - `SUPABASE_CONN_STRING` (optional)
-   - `SUPABASE_URL` / `SUPABASE_KEY` (optional, for email notifications)
-   - `RESEND_API_KEY` (optional)
-   - `ALLOWED_ORIGINS` — set to your Vercel frontend URL, e.g. `https://hecatron.vercel.app`
-4. Deploy the frontend to Vercel/Netlify:
-   - Set `VITE_API_BASE` env var to your Render backend URL (e.g. `https://hecatron-api.onrender.com`)
-   - Build command: `npm run build`, output: `dist`
-
----
-
-## API Endpoints
+## API Reference
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `GET` | `/health` | Health check |
-| `GET` | `/flight/{flight_number}` | Flight details & fog risk status |
-| `POST` | `/subscribe` | Register email for weather alerts |
-| `POST` | `/refund` | Submit EU261 refund claim |
+| `GET` | `/flight/{flight_number}` | Flight details + fog risk status |
+| `POST` | `/subscribe` | Register email for fog alerts |
+| `POST` | `/refund` | Submit EU 261/2004 refund claim |
 | `POST` | `/reroute` | Get ranked alternative transport options |
 
----
-
-## Transport Adapters
-
-Adapter pattern — each source implements the same interface. Failures are skipped.
-
-| Adapter | Source | Data |
-|---------|--------|------|
-| `adapter_flixbus.py` | FlixBus public API | Real-time bus trips |
-| `adapter_train.py` | CFR timetable (static) | Iași → București trains |
-| `adapter_gflights_cached.py` | Pre-scraped Google Flights | 7 days cached flight data |
-
-**Scoring** (lower = better):
+**Rerouting score** (lower = better):
 ```
 score = 1.0 × arrival_lateness_hours + 0.05 × price_eur + 1.5 × transfers
 ```
 
----
-
-## ML Service (fog prediction)
-
-Located in `ml/`. Predicts `P(visibility < 1000m)` at 2h and 6h horizons using LightGBM + calibration.
-
-```bash
-cd ml
-pip install -e ".[serve]"   # or: uv sync --extra serve
-python train.py             # train model (requires historical METAR data)
-uvicorn app:app --port 8001
-```
-
-The rerouting API calls the ML service at `ML_API_URL` (default `http://localhost:8001`). If it's not running, flight status falls back to the hardcoded `status` field in `flights_db.py`.
-
-### ML Architecture
-```
-ingest → features → splits → model (LightGBM + calibration) → conformal → decision → FastAPI
-```
+Transport adapters: FlixBus (real-time), CFR trains (static timetable), Google Flights (7-day cache). Adapter failures are silently skipped.
 
 ---
 
 ## Data Pipeline
 
-METAR weather observations for LRIA:
+METAR observations are fetched from [Aviation Weather Center](https://aviationweather.gov/api/data/metar) and stored in Supabase.
 
-- `data-pipeline/backfill_metar.py` — load historical data into Supabase
-- `data-pipeline/live_ingest.py` — periodic ingest (cron / GitHub Actions)
-- `data-pipeline/create_subscriptions_table.py` — init subscriptions table
-- `data-pipeline/create_refunds_table.py` — init refund claims table
+```bash
+# One-time backfill (requires SUPABASE_CONN_STRING in .env)
+python data-pipeline/backfill_metar.py
+
+# Init DB tables
+python data-pipeline/create_subscriptions_table.py
+python data-pipeline/create_refunds_table.py
+```
+
+GitHub Actions automates everything in production:
+- **`ingest.yml`** — runs every 15 minutes, ingests latest METAR, triggers ML prediction
+- **`train_model.yml`** — runs every Monday at 03:00 UTC, retrains the model and commits updated artifacts
 
 ---
 
-## Frontend Screens
+## Deploy to Render + Vercel
 
-1. **Home** — enter flight number + email (subscribes to alerts)
-2. **Flight Status** — route info, schedule, ON TIME / FOG RISK status
-3. **Cancelled** — EU261 options: refund or find alternatives
-4. **Alternatives** — ranked flights, buses, trains with prices and booking links
-5. **Refund Claim** — submit passenger info and PNR for EU261 credits
+### Backend (Render)
+1. Push the repo to GitHub
+2. Create a new Render Web Service — `render.yaml` is auto-detected
+3. Set environment variables in the Render dashboard (see below)
+
+### Frontend (Vercel)
+- Build command: `npm run build`
+- Output directory: `dist`
+- Set `VITE_API_BASE` to your Render backend URL
+
+---
+
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `SUPABASE_CONN_STRING` | No | PostgreSQL connection string for Supabase |
+| `SUPABASE_URL` | No | Supabase project URL (email notifications) |
+| `SUPABASE_KEY` | No | Supabase anon/service key |
+| `RESEND_API_KEY` | No | [Resend](https://resend.com) key for email alerts |
+| `ML_API_URL` | No | URL of the ML service (default: `http://localhost:8001`) |
+| `ALLOWED_ORIGINS` | No | Comma-separated CORS origins for the backend |
+| `VITE_API_BASE` | No (frontend) | Backend URL used by the React app |
+
+All variables are optional for local demo mode.
+
+---
+
+## Project Structure
+
+```
+hecatron/
+├── frontend/          # React + TypeScript UI
+│   └── src/screens/   # 5 screens: home, status, cancelled, alternatives, refund
+├── rerouting/         # FastAPI rerouting API + transport adapters
+├── ml/                # ML fog prediction service
+│   ├── src/           # ingest · features · splits · model · conformal · decision
+│   ├── train.py       # training entry point
+│   ├── app.py         # FastAPI inference service (live METAR enrichment)
+│   └── models/        # serialised LightGBM model artifacts
+├── data-pipeline/     # METAR ingestion scripts + DB schema
+└── .github/workflows/ # MLOps automation (ingest + retrain)
+```
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).
